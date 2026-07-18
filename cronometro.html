@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHRONO // HUD</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #00f5ff;
+    --cyan-dim: rgba(0,245,255,0.15);
+    --cyan-glow: rgba(0,245,255,0.4);
+    --green: #39ff14;
+    --bg: rgba(4, 12, 20, 0.92);
+    --border: rgba(0,245,255,0.3);
+    --text-dim: rgba(0,245,255,0.5);
+    --app-opacity: 1;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+  }
+
+  /* Draggable wrapper */
+  #app {
+    opacity: var(--app-opacity);
+    position: fixed;
+    top: 40px;
+    right: 40px;
+    width: 380px;
+    cursor: grab;
+    user-select: none;
+    z-index: 9999;
+    transition: opacity 0.3s ease;
+  }
+
+  #app:active { cursor: grabbing; }
+
+  /* Main container */
+  .hud-container {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    position: relative;
+    box-shadow:
+      0 0 0 1px rgba(0,245,255,0.05),
+      0 0 30px rgba(0,245,255,0.08),
+      0 0 80px rgba(0,245,255,0.04),
+      inset 0 0 40px rgba(0,245,255,0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Corner decorations */
+  .hud-container::before,
+  .hud-container::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+  }
+  .hud-container::before {
+    top: -1px; left: -1px;
+    border-top: 2px solid var(--cyan);
+    border-left: 2px solid var(--cyan);
+  }
+  .hud-container::after {
+    bottom: -1px; right: -1px;
+    border-bottom: 2px solid var(--cyan);
+    border-right: 2px solid var(--cyan);
+  }
+  .corner-tr, .corner-bl {
+    position: absolute;
+    width: 12px; height: 12px;
+  }
+  .corner-tr { top: -1px; right: -1px; border-top: 2px solid var(--cyan); border-right: 2px solid var(--cyan); }
+  .corner-bl { bottom: -1px; left: -1px; border-bottom: 2px solid var(--cyan); border-left: 2px solid var(--cyan); }
+
+  /* Header */
+  .hud-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(0,245,255,0.1);
+  }
+
+  .hud-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+
+  .hud-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: all 0.3s;
+  }
+  .status-dot.running {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse-dot 1s infinite;
+  }
+  .status-dot.paused {
+    background: #ff9500;
+    box-shadow: 0 0 8px #ff9500;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Timer display */
+  .timer-display {
+    text-align: center;
+    padding: 16px 0;
+    position: relative;
+  }
+
+  .timer-main {
+    font-family: 'Orbitron', monospace;
+    font-size: 52px;
+    font-weight: 900;
+    color: var(--cyan);
+    letter-spacing: 4px;
+    line-height: 1;
+    text-shadow:
+      0 0 10px var(--cyan-glow),
+      0 0 30px rgba(0,245,255,0.2),
+      0 0 60px rgba(0,245,255,0.1);
+    transition: text-shadow 0.3s;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timer-main.running {
+    text-shadow:
+      0 0 10px var(--cyan-glow),
+      0 0 30px rgba(0,245,255,0.4),
+      0 0 80px rgba(0,245,255,0.2);
+  }
+
+  .timer-ms {
+    font-family: 'Orbitron', monospace;
+    font-size: 20px;
+    font-weight: 400;
+    color: rgba(0,245,255,0.4);
+    letter-spacing: 3px;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Scan line effect */
+  .scan-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .running-anim .scan-line {
+    animation: scan 2s linear infinite;
+    opacity: 1;
+  }
+  @keyframes scan {
+    0% { top: 0; opacity: 0.8; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0,245,255,0.1);
+  }
+
+  .btn {
+    flex: 1;
+    padding: 10px 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    border-radius: 2px;
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--cyan-dim);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .btn:hover::before { opacity: 1; }
+  .btn:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0,245,255,0.2);
+    color: #fff;
+  }
+
+  .btn:active { transform: scale(0.97); }
+
+  .btn-primary {
+    border-color: var(--cyan);
+    background: rgba(0,245,255,0.05);
+  }
+
+  .btn-danger {
+    border-color: rgba(255,60,60,0.4);
+    color: rgba(255,80,80,0.8);
+  }
+  .btn-danger::before { background: rgba(255,60,60,0.05); }
+  .btn-danger:hover { border-color: #ff3c3c; box-shadow: 0 0 12px rgba(255,60,60,0.2); color: #fff; }
+
+  /* Opacity slider */
+  .opacity-section {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(0,245,255,0.08);
+  }
+
+  .opacity-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .opacity-value {
+    color: var(--cyan);
+  }
+
+  .slider-wrap {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 2px;
+    background: rgba(0,245,255,0.15);
+    border-radius: 0;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 0;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan-glow);
+    cursor: pointer;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+
+  /* Quick opacity buttons */
+  .opacity-presets {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .preset-btn {
+    flex: 1;
+    padding: 4px 0;
+    background: transparent;
+    border: 1px solid rgba(0,245,255,0.15);
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .preset-btn:hover, .preset-btn.active {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: var(--cyan-dim);
+  }
+
+  /* Log panel */
+  .log-section {
+    margin-top: 14px;
+    border-top: 1px solid rgba(0,245,255,0.08);
+  }
+
+  .log-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+  .log-toggle:hover { color: var(--cyan); }
+
+  .log-arrow {
+    font-size: 8px;
+    transition: transform 0.3s;
+  }
+  .log-arrow.open { transform: rotate(180deg); }
+
+  .log-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .log-panel.open { max-height: 200px; }
+
+  .log-inner {
+    margin-top: 10px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(0,245,255,0.08);
+    border-radius: 2px;
+    padding: 10px;
+    max-height: 160px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .log-inner::-webkit-scrollbar { width: 3px; }
+  .log-inner::-webkit-scrollbar-track { background: transparent; }
+  .log-inner::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0; }
+
+  .log-entry {
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(0,245,255,0.04);
+    display: flex;
+    gap: 10px;
+    animation: fadeInLog 0.3s ease;
+  }
+
+  @keyframes fadeInLog {
+    from { opacity: 0; transform: translateX(-4px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .log-time { color: rgba(0,245,255,0.35); flex-shrink: 0; }
+  .log-event { color: rgba(0,245,255,0.7); }
+  .log-event.ev-start { color: var(--green); }
+  .log-event.ev-pause { color: #ff9500; }
+  .log-event.ev-reset { color: rgba(255,60,60,0.8); }
+  .log-event.ev-resume { color: #00d4ff; }
+
+  .log-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .log-btn {
+    flex: 1;
+    padding: 5px;
+    background: transparent;
+    border: 1px solid rgba(0,245,255,0.1);
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .log-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  /* Noise overlay */
+  .noise {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 128px;
+  }
+
+  .log-empty {
+    color: rgba(0,245,255,0.2);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-align: center;
+    padding: 10px 0;
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+
+<div id="app">
+  <div class="hud-container">
+    <span class="corner-tr"></span>
+    <span class="corner-bl"></span>
+
+    <div class="hud-header">
+      <div class="hud-title">CHRONO // HUD</div>
+      <div class="hud-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">STANDBY</span>
+      </div>
+    </div>
+
+    <div class="timer-display" id="timerDisplay">
+      <div class="scan-line"></div>
+      <div class="timer-main" id="timerMain">00:00:00</div>
+      <div class="timer-ms" id="timerMs">.000</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="btnStart" onclick="startStop()">INICIAR</button>
+      <button class="btn" id="btnPause" onclick="pauseResume()" style="display:none">PAUSAR</button>
+      <button class="btn btn-danger" id="btnReset" onclick="reset()">RESET</button>
+    </div>
+
+    <div class="opacity-section">
+      <div class="opacity-label">
+        <span>TRANSPARÊNCIA</span>
+        <span class="opacity-value" id="opacityVal">100%</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" min="20" max="100" value="100" id="opacitySlider" oninput="setOpacity(this.value)">
+      </div>
+      <div class="opacity-presets">
+        <button class="preset-btn active" onclick="setPreset(100)">100%</button>
+        <button class="preset-btn" onclick="setPreset(80)">80%</button>
+        <button class="preset-btn" onclick="setPreset(60)">60%</button>
+        <button class="preset-btn" onclick="setPreset(40)">40%</button>
+        <button class="preset-btn" onclick="setPreset(20)">20%</button>
+      </div>
+    </div>
+
+    <div class="log-section">
+      <div class="log-toggle" onclick="toggleLog()">
+        <span>▸ LOG DE EVENTOS</span>
+        <span class="log-arrow" id="logArrow">▲</span>
+      </div>
+      <div class="log-panel" id="logPanel">
+        <div class="log-inner" id="logInner">
+          <div class="log-empty" id="logEmpty">// sem registros</div>
+        </div>
+        <div class="log-actions">
+          <button class="log-btn" onclick="exportLog()">EXPORTAR</button>
+          <button class="log-btn" onclick="clearLog()">LIMPAR</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────
+  let running = false;
+  let paused = false;
+  let startTime = 0;
+  let elapsed = 0;
+  let rafId = null;
+  let logs = [];
+
+  // ── Timer ──────────────────────────────────────────────
+  function tick() {
+    const now = performance.now();
+    const total = elapsed + (now - startTime);
+    renderTime(total);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function renderTime(ms) {
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    const millis = Math.floor(ms % 1000);
+    document.getElementById('timerMain').textContent =
+      pad(h) + ':' + pad(m) + ':' + pad(s);
+    document.getElementById('timerMs').textContent =
+      '.' + String(millis).padStart(3, '0');
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function startStop() {
+    if (!running && !paused) {
+      // Fresh start
+      running = true;
+      startTime = performance.now();
+      rafId = requestAnimationFrame(tick);
+      setStatus('running');
+      addLog('INICIADO');
+      document.getElementById('btnStart').textContent = 'PARAR';
+      document.getElementById('btnPause').style.display = '';
+      document.getElementById('timerDisplay').classList.add('running-anim');
+      document.getElementById('timerMain').classList.add('running');
+    } else if (running) {
+      // Stop completely
+      running = false;
+      paused = false;
+      cancelAnimationFrame(rafId);
+      elapsed += performance.now() - startTime;
+      setStatus('standby');
+      addLog('ENCERRADO');
+      document.getElementById('btnStart').textContent = 'INICIAR';
+      document.getElementById('btnPause').style.display = 'none';
+      document.getElementById('timerDisplay').classList.remove('running-anim');
+      document.getElementById('timerMain').classList.remove('running');
+    }
+  }
+
+  function pauseResume() {
+    if (running && !paused) {
+      // Pause
+      paused = true;
+      running = false;
+      cancelAnimationFrame(rafId);
+      elapsed += performance.now() - startTime;
+      setStatus('paused');
+      addLog('PAUSADO');
+      document.getElementById('btnPause').textContent = 'RETOMAR';
+      document.getElementById('timerDisplay').classList.remove('running-anim');
+      document.getElementById('timerMain').classList.remove('running');
+    } else if (paused) {
+      // Resume
+      paused = false;
+      running = true;
+      startTime = performance.now();
+      rafId = requestAnimationFrame(tick);
+      setStatus('running');
+      addLog('RETOMADO');
+      document.getElementById('btnPause').textContent = 'PAUSAR';
+      document.getElementById('timerDisplay').classList.add('running-anim');
+      document.getElementById('timerMain').classList.add('running');
+    }
+  }
+
+  function reset() {
+    cancelAnimationFrame(rafId);
+    running = false;
+    paused = false;
+    elapsed = 0;
+    renderTime(0);
+    setStatus('standby');
+    addLog('RESETADO');
+    document.getElementById('btnStart').textContent = 'INICIAR';
+    document.getElementById('btnPause').style.display = 'none';
+    document.getElementById('btnPause').textContent = 'PAUSAR';
+    document.getElementById('timerDisplay').classList.remove('running-anim');
+    document.getElementById('timerMain').classList.remove('running');
+  }
+
+  function setStatus(state) {
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    dot.className = 'status-dot ' + state;
+    const labels = { running: 'ATIVO', paused: 'PAUSADO', standby: 'STANDBY' };
+    txt.textContent = labels[state] || 'STANDBY';
+  }
+
+  // ── Opacity ────────────────────────────────────────────
+  function setOpacity(val) {
+    document.getElementById('app').style.opacity = val / 100;
+    document.getElementById('opacityVal').textContent = val + '%';
+    document.getElementById('opacitySlider').value = val;
+    // Update preset active state
+    document.querySelectorAll('.preset-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent === val + '%');
+    });
+  }
+
+  function setPreset(val) {
+    setOpacity(val);
+  }
+
+  // ── Logs ───────────────────────────────────────────────
+  function addLog(event) {
+    const now = new Date();
+    const ts = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    const timerVal = document.getElementById('timerMain').textContent +
+                     document.getElementById('timerMs').textContent;
+    logs.push({ ts, event, timerVal });
+
+    const inner = document.getElementById('logInner');
+    const empty = document.getElementById('logEmpty');
+    if (empty) empty.remove();
+
+    const evClasses = {
+      'INICIADO': 'ev-start', 'RETOMADO': 'ev-resume',
+      'PAUSADO': 'ev-pause', 'ENCERRADO': 'ev-pause',
+      'RESETADO': 'ev-reset'
+    };
+
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="log-time">${ts}</span><span class="log-event ${evClasses[event]||''}">${event}</span><span class="log-time">${timerVal}</span>`;
+    inner.appendChild(entry);
+    inner.scrollTop = inner.scrollHeight;
+  }
+
+  function toggleLog() {
+    const panel = document.getElementById('logPanel');
+    const arrow = document.getElementById('logArrow');
+    panel.classList.toggle('open');
+    arrow.classList.toggle('open');
+  }
+
+  function clearLog() {
+    logs = [];
+    const inner = document.getElementById('logInner');
+    inner.innerHTML = '<div class="log-empty" id="logEmpty">// sem registros</div>';
+  }
+
+  function exportLog() {
+    if (!logs.length) return;
+    const lines = ['CHRONO // HUD — LOG DE EVENTOS', '================================', ''];
+    logs.forEach(l => {
+      lines.push(`[${l.ts}] ${l.event.padEnd(10)} @ ${l.timerVal}`);
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'chrono_log_' + new Date().toISOString().slice(0,10) + '.txt';
+    a.click();
+  }
+
+  // ── Drag ───────────────────────────────────────────────
+  const app = document.getElementById('app');
+  let drag = false, ox = 0, oy = 0;
+
+  app.addEventListener('mousedown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+    drag = true;
+    ox = e.clientX - app.getBoundingClientRect().left;
+    oy = e.clientY - app.getBoundingClientRect().top;
+    app.style.transition = 'none';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!drag) return;
+    app.style.left = (e.clientX - ox) + 'px';
+    app.style.top = (e.clientY - oy) + 'px';
+    app.style.right = 'auto';
+  });
+
+  document.addEventListener('mouseup', () => {
+    drag = false;
+    app.style.transition = 'opacity 0.3s ease';
+  });
+</script>
+</body>
+</html>
