@@ -1,0 +1,157 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B10000000000000000000001 /* ChronoHUDApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* ChronoHUDApp.swift */; };
+		B10000000000000000000002 /* DomainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* DomainModels.swift */; };
+		B10000000000000000000003 /* TimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* TimerEngine.swift */; };
+		B10000000000000000000004 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* AppServices.swift */; };
+		B10000000000000000000005 /* OverlayPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* OverlayPanelController.swift */; };
+		B10000000000000000000006 /* Views.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000006 /* Views.swift */; };
+		B10000000000000000000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* Assets.xcassets */; };
+		B10000000000000000000008 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* Localizable.xcstrings */; };
+		B10000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000C /* PrivacyInfo.xcprivacy */; };
+		B20000000000000000000001 /* TimerEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* TimerEngineTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		E20000000000000000000001 = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 900000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 910000000000000000000001;
+			remoteInfo = ChronoHUD;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000001 /* ChronoHUDApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChronoHUDApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000002 /* DomainModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainModels.swift; sourceTree = "<group>"; };
+		A10000000000000000000003 /* TimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerEngine.swift; sourceTree = "<group>"; };
+		A10000000000000000000004 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
+		A10000000000000000000005 /* OverlayPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPanelController.swift; sourceTree = "<group>"; };
+		A10000000000000000000006 /* Views.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views.swift; sourceTree = "<group>"; };
+		A10000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
+		A10000000000000000000008 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Resources/Localizable.xcstrings; sourceTree = "<group>"; };
+		A10000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Resources/Info.plist; sourceTree = "<group>"; };
+		A1000000000000000000000A /* ChronoHUD.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Resources/ChronoHUD.entitlements; sourceTree = "<group>"; };
+		A1000000000000000000000C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A1000000000000000000000B /* ChronoHUD.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChronoHUD.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000001 /* TimerEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerEngineTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* ChronoHUDTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ChronoHUDTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F10000000000000000000001 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		F20000000000000000000001 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		800000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				810000000000000000000001 /* ChronoHUD */,
+				820000000000000000000001 /* ChronoHUDTests */,
+				800000000000000000000002 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		800000000000000000000002 /* Products */ = {isa = PBXGroup; children = (A1000000000000000000000B /* ChronoHUD.app */, A20000000000000000000002 /* ChronoHUDTests.xctest */); name = Products; sourceTree = "<group>"; };
+		810000000000000000000001 /* ChronoHUD */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000001,
+				A10000000000000000000002,
+				A10000000000000000000003,
+				A10000000000000000000004,
+				A10000000000000000000005,
+				A10000000000000000000006,
+				A10000000000000000000007,
+				A10000000000000000000008,
+				A10000000000000000000009,
+				A1000000000000000000000A,
+				A1000000000000000000000C,
+			);
+			path = ChronoHUD;
+			sourceTree = "<group>";
+		};
+		820000000000000000000001 /* ChronoHUDTests */ = {isa = PBXGroup; children = (A20000000000000000000001); path = ChronoHUDTests; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		910000000000000000000001 /* ChronoHUD */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 710000000000000000000001;
+			buildPhases = (610000000000000000000001, F10000000000000000000001, 510000000000000000000001);
+			buildRules = ();
+			dependencies = ();
+			name = ChronoHUD;
+			productName = ChronoHUD;
+			productReference = A1000000000000000000000B;
+			productType = "com.apple.product-type.application";
+		};
+		920000000000000000000001 /* ChronoHUDTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 720000000000000000000001;
+			buildPhases = (620000000000000000000001, F20000000000000000000001, 520000000000000000000001);
+			buildRules = ();
+			dependencies = (D20000000000000000000001);
+			name = ChronoHUDTests;
+			productName = ChronoHUDTests;
+			productReference = A20000000000000000000002;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		900000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2660; LastUpgradeCheck = 2660; TargetAttributes = {910000000000000000000001 = {CreatedOnToolsVersion = 26.6;}; 920000000000000000000001 = {CreatedOnToolsVersion = 26.6; TestTargetID = 910000000000000000000001;};};};
+			buildConfigurationList = 700000000000000000000001;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, "pt-BR", Base);
+			mainGroup = 800000000000000000000001;
+			productRefGroup = 800000000000000000000002;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (910000000000000000000001, 920000000000000000000001);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		510000000000000000000001 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (B10000000000000000000007, B10000000000000000000008, B10000000000000000000009); runOnlyForDeploymentPostprocessing = 0; };
+		520000000000000000000001 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		610000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003, B10000000000000000000004, B10000000000000000000005, B10000000000000000000006); runOnlyForDeploymentPostprocessing = 0; };
+		620000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B20000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D20000000000000000000001 = {isa = PBXTargetDependency; target = 910000000000000000000001; targetProxy = E20000000000000000000001; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		C00000000000000000000001 = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; SWIFT_VERSION = 5.0;}; name = Debug;};
+		C00000000000000000000002 = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_VERSION = 5.0;}; name = Release;};
+		C10000000000000000000001 = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_ENTITLEMENTS = ChronoHUD/Resources/ChronoHUD.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; ENABLE_HARDENED_RUNTIME = YES; ENABLE_TESTABILITY = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChronoHUD/Resources/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; MARKETING_VERSION = 1.0.0; PRODUCT_BUNDLE_IDENTIFIER = com.pauloricardo.chronohud; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_VERSION = 5.0;}; name = Debug;};
+		C10000000000000000000002 = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_ENTITLEMENTS = ChronoHUD/Resources/ChronoHUD.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChronoHUD/Resources/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; MARKETING_VERSION = 1.0.0; PRODUCT_BUNDLE_IDENTIFIER = com.pauloricardo.chronohud; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0;}; name = Release;};
+		C20000000000000000000001 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; PRODUCT_BUNDLE_IDENTIFIER = com.pauloricardo.chronohud.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChronoHUD.app/Contents/MacOS/ChronoHUD";}; name = Debug;};
+		C20000000000000000000002 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; PRODUCT_BUNDLE_IDENTIFIER = com.pauloricardo.chronohud.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChronoHUD.app/Contents/MacOS/ChronoHUD";}; name = Release;};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		700000000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (C00000000000000000000001, C00000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+		710000000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (C10000000000000000000001, C10000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+		720000000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (C20000000000000000000001, C20000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+/* End XCConfigurationList section */
+	};
+	rootObject = 900000000000000000000001 /* Project object */;
+}
