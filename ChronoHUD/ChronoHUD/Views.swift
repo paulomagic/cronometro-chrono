@@ -6,22 +6,41 @@ struct OverlayView: View {
     @EnvironmentObject private var appModel: AppModel
 
     var body: some View {
-        OverlayContentView(engine: appModel.engine)
+        OverlayContentView(
+            engine: appModel.engine,
+            settings: appModel.settings
+        )
             .environmentObject(appModel)
     }
 }
 
 private struct OverlayContentView: View {
     @EnvironmentObject private var appModel: AppModel
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @ObservedObject var engine: TimerEngine
+    @ObservedObject var settings: SettingsStore
 
-    private var preferences: UserPreferences { appModel.settings.preferences }
+    private var preferences: UserPreferences { settings.preferences }
     private var accent: Color { Color.chronoAccent(preferences.accent) }
     private var isPremium: Bool { preferences.theme == .premium }
 
     var body: some View {
         Group {
-            if preferences.compactMode { compactBody } else { fullBody }
+            if preferences.compactMode {
+                MinimalOverlayView(
+                    display: engine.display,
+                    mode: engine.mode,
+                    state: engine.state,
+                    showMilliseconds: preferences.showMilliseconds,
+                    accent: accent,
+                    isPremium: isPremium,
+                    toggleTimer: appModel.toggleTimer,
+                    resetTimer: appModel.resetTimer,
+                    showFullLayout: showFullLayout
+                )
+            } else {
+                fullBody
+            }
         }
         .environment(\.colorScheme, isPremium ? .dark : .light)
         .background(background)
@@ -33,7 +52,7 @@ private struct OverlayContentView: View {
                 RoundedRectangle(cornerRadius: 18).stroke(accent, lineWidth: 3).transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: appModel.completionPulse)
+        .animation(accessibilityReduceMotion ? nil : .easeInOut(duration: 0.25), value: appModel.completionPulse)
         .accessibilityElement(children: .contain)
     }
 
@@ -45,11 +64,30 @@ private struct OverlayContentView: View {
                     .foregroundStyle(accent)
                 Spacer()
                 statusPill
-                Button { appModel.togglePinned() } label: {
-                    Image(systemName: appModel.isPinned ? "pin.fill" : "pin")
+                Button(action: showEssentialLayout) {
+                    Image(systemName: "rectangle.compress.vertical")
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(String(localized: "overlay.pin"))
+                .accessibilityLabel(String(localized: "overlay.layout.essential"))
+                .help(String(localized: "overlay.layout.essential"))
+                Button { appModel.togglePinned() } label: {
+                    Image(systemName: appModel.isPinned ? "pin.fill" : "pin")
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(appModel.isPinned ? String(localized: "overlay.unpin") : String(localized: "overlay.pin"))
+                .help(appModel.isPinned ? String(localized: "overlay.unpin") : String(localized: "overlay.pin"))
+                Button(role: .destructive, action: appModel.quit) {
+                    Image(systemName: "xmark")
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "action.quit"))
+                .help(String(localized: "action.quit"))
             }
 
             Picker("", selection: Binding(get: { engine.mode }, set: { appModel.requestModeChange($0) })) {
@@ -73,19 +111,15 @@ private struct OverlayContentView: View {
                 .font(.caption)
                 .multilineTextAlignment(.center)
 
-            VStack(spacing: 8) {
-                Text(formatInterval(engine.displayedInterval, milliseconds: preferences.showMilliseconds && engine.mode == .stopwatch))
-                    .font(.system(size: 43, weight: .bold, design: .monospaced))
-                    .contentTransition(.numericText())
-                    .foregroundStyle(isPremium ? accent : .primary)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                    .accessibilityLabel(accessibilityTime(engine.displayedInterval))
-                if engine.mode != .stopwatch {
-                    ProgressView(value: engine.progress)
-                        .tint(accent)
-                }
-            }
+            TimerReadoutView(
+                display: engine.display,
+                mode: engine.mode,
+                phaseDuration: engine.phaseDuration,
+                showMilliseconds: preferences.showMilliseconds,
+                accent: accent,
+                isPremium: isPremium,
+                compact: false
+            )
 
             HStack(spacing: 10) {
                 Button(engine.state.localizedActionTitle) {
@@ -236,23 +270,12 @@ private struct OverlayContentView: View {
         }
     }
 
-    private var compactBody: some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(engine.state == .running ? accent : Color.secondary.opacity(0.5))
-                .frame(width: 8, height: 8)
-            Text(formatInterval(engine.displayedInterval, milliseconds: preferences.showMilliseconds && engine.mode == .stopwatch))
-                .font(.system(size: 30, weight: .bold, design: .monospaced))
-                .foregroundStyle(isPremium ? accent : .primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .accessibilityLabel(accessibilityTime(engine.displayedInterval))
-            if engine.mode != .stopwatch {
-                ProgressView(value: engine.progress).tint(accent).frame(width: 42)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
+    private func showEssentialLayout() {
+        appModel.updatePreferences { $0.compactMode = true }
+    }
+
+    private func showFullLayout() {
+        appModel.updatePreferences { $0.compactMode = false }
     }
 
     private var statusPill: some View {
@@ -278,6 +301,126 @@ private struct OverlayContentView: View {
     private var border: some View {
         RoundedRectangle(cornerRadius: preferences.compactMode ? 14 : 18, style: .continuous)
             .stroke(appModel.isClickThrough ? Color.orange : (isPremium ? accent.opacity(0.38) : Color.primary.opacity(0.10)), lineWidth: appModel.isClickThrough ? 2 : 1)
+    }
+}
+
+private struct MinimalOverlayView: View {
+    @ObservedObject var display: TimerDisplay
+    let mode: TimerMode
+    let state: RunState
+    let showMilliseconds: Bool
+    let accent: Color
+    let isPremium: Bool
+    let toggleTimer: () -> Void
+    let resetTimer: () -> Void
+    let showFullLayout: () -> Void
+
+    private var statusColor: Color {
+        state == .running ? accent : Color.secondary.opacity(0.65)
+    }
+
+    private var statusDescription: String {
+        String(
+            format: String(localized: "overlay.minimal.status"),
+            String(localized: String.LocalizationValue(mode.titleKey)).uppercased(),
+            state.localizedTitle
+        )
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+                .shadow(color: state == .running ? accent.opacity(0.45) : .clear, radius: 4)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(formatInterval(display.interval, milliseconds: showMilliseconds && mode == .stopwatch))
+                    .font(.system(size: 23, weight: .bold, design: .monospaced))
+                    .foregroundStyle(isPremium ? accent : .primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .contentTransition(.numericText())
+                    .accessibilityLabel(accessibilityTime(display.interval))
+
+                Text(statusDescription)
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(statusColor)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+
+            HStack(spacing: 6) {
+                Button(action: toggleTimer) {
+                    Image(systemName: state == .running ? "pause.fill" : "play.fill")
+                }
+                .buttonStyle(MinimalControlButtonStyle(color: accent, isPrimary: true))
+                .accessibilityLabel(state.localizedActionTitle)
+                .help(state.localizedActionTitle)
+
+                Button(action: resetTimer) {
+                    Image(systemName: "arrow.counterclockwise")
+                }
+                .buttonStyle(MinimalControlButtonStyle(color: accent, isPrimary: false))
+                .accessibilityLabel(String(localized: "action.reset"))
+                .help(String(localized: "action.reset"))
+
+                Button(action: showFullLayout) {
+                    Image(systemName: "rectangle.expand.vertical")
+                }
+                .buttonStyle(MinimalControlButtonStyle(color: accent, isPrimary: false))
+                .accessibilityLabel(String(localized: "overlay.layout.full"))
+                .help(String(localized: "overlay.layout.full"))
+            }
+            .accessibilityElement(children: .contain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+}
+
+private struct TimerReadoutView: View {
+    @ObservedObject var display: TimerDisplay
+    let mode: TimerMode
+    let phaseDuration: TimeInterval
+    let showMilliseconds: Bool
+    let accent: Color
+    let isPremium: Bool
+    let compact: Bool
+
+    private var progress: Double {
+        guard mode != .stopwatch, phaseDuration > 0 else { return 0 }
+        return min(max(1 - display.interval / phaseDuration, 0), 1)
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if compact {
+            Text(formatInterval(display.interval, milliseconds: showMilliseconds && mode == .stopwatch))
+                .font(.system(size: 30, weight: .bold, design: .monospaced))
+                .foregroundStyle(isPremium ? accent : .primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .accessibilityLabel(accessibilityTime(display.interval))
+            if mode != .stopwatch {
+                ProgressView(value: progress).tint(accent).frame(width: 42)
+            }
+        } else {
+            VStack(spacing: 8) {
+                Text(formatInterval(display.interval, milliseconds: showMilliseconds && mode == .stopwatch))
+                    .font(.system(size: 43, weight: .bold, design: .monospaced))
+                    .contentTransition(.numericText())
+                    .foregroundStyle(isPremium ? accent : .primary)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                    .accessibilityLabel(accessibilityTime(display.interval))
+                if mode != .stopwatch {
+                    ProgressView(value: progress).tint(accent)
+                }
+            }
+        }
     }
 }
 
@@ -352,8 +495,14 @@ struct HistoryView: View {
                             }
                             Spacer()
                             Text(formatInterval(session.activeDuration, milliseconds: false)).monospacedDigit()
-                            Button(role: .destructive) { appModel.repository.delete(session) } label: { Image(systemName: "trash") }
+                            Button(role: .destructive) {
+                                do { try appModel.repository.delete(session) }
+                                catch { appModel.showError(error.localizedDescription) }
+                            } label: {
+                                Image(systemName: "trash")
+                            }
                                 .buttonStyle(.borderless)
+                                .accessibilityLabel(String(localized: "history.delete.session"))
                         }
                         .padding(.vertical, 4)
                     }
@@ -504,6 +653,23 @@ private struct ChronoSecondaryButtonStyle: ButtonStyle {
     }
 }
 
+private struct MinimalControlButtonStyle: ButtonStyle {
+    let color: Color
+    let isPrimary: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: .bold))
+            .frame(width: 32, height: 32)
+            .foregroundStyle(isPrimary ? Color.black : Color.primary)
+            .background(
+                isPrimary ? color.opacity(configuration.isPressed ? 0.62 : 0.92) : Color.primary.opacity(configuration.isPressed ? 0.12 : 0.07),
+                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+            )
+            .contentShape(Rectangle())
+    }
+}
+
 private struct OpacityPresetButtonStyle: ButtonStyle {
     let color: Color
     let selected: Bool
@@ -571,10 +737,13 @@ func formatInterval(_ interval: TimeInterval, milliseconds: Bool) -> String {
 }
 
 private func formatEventTimestamp(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.dateFormat = "HH:mm:ss"
-    return formatter.string(from: date)
+    date.formatted(
+        .dateTime
+            .hour(.twoDigits(amPM: .omitted))
+            .minute(.twoDigits)
+            .second(.twoDigits)
+            .locale(Locale(identifier: "en_US_POSIX"))
+    )
 }
 
 func accessibilityTime(_ interval: TimeInterval) -> String {

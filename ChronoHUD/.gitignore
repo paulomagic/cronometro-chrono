@@ -1,0 +1,5 @@
+# Agent runtime state
+agents/current_name.txt
+agents/locks/
+tasks/claims/
+tasks/locks/

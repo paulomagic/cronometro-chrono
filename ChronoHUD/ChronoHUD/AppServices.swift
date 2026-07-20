@@ -8,26 +8,49 @@ import UserNotifications
 
 @MainActor
 final class SessionRepository {
+    typealias SaveAction = @MainActor (ModelContext) throws -> Void
+
     let context: ModelContext
+    private let saveAction: SaveAction
 
-    init(container: ModelContainer) {
+    init(
+        container: ModelContainer,
+        saveAction: @escaping SaveAction = { try $0.save() }
+    ) {
         context = ModelContext(container)
-        context.autosaveEnabled = true
+        context.autosaveEnabled = false
+        self.saveAction = saveAction
     }
 
-    func insert(_ draft: SessionDraft) {
-        context.insert(SessionRecord(draft: draft))
-        try? context.save()
+    func insert(_ draft: SessionDraft) throws {
+        let record = SessionRecord(draft: draft)
+        context.insert(record)
+        do {
+            try saveAction(context)
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 
-    func delete(_ record: SessionRecord) {
+    func delete(_ record: SessionRecord) throws {
         context.delete(record)
-        try? context.save()
+        do {
+            try saveAction(context)
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 
     func deleteAll() throws {
-        try context.delete(model: SessionRecord.self)
-        try context.save()
+        do {
+            try context.delete(model: SessionRecord.self)
+            try saveAction(context)
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 }
 
@@ -55,38 +78,118 @@ final class SnapshotStore {
     }
 }
 
+enum NotificationPermissionStatus {
+    case allowed
+    case notDetermined
+    case denied
+}
+
+struct CompletionNotificationRequest: Equatable {
+    let interval: TimeInterval
+    let title: String
+    let body: String
+}
+
 @MainActor
-final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
-    private let center = UNUserNotificationCenter.current()
+protocol UserNotificationCenterClient: AnyObject {
+    var delegate: UNUserNotificationCenterDelegate? { get set }
+    func permissionStatus() async -> NotificationPermissionStatus
+    func requestAuthorization() async throws -> Bool
+    func add(_ request: CompletionNotificationRequest) async throws
+    func removeCompletionRequest()
+}
+
+@MainActor
+final class SystemUserNotificationCenterClient: UserNotificationCenterClient {
+    private let center: UNUserNotificationCenter
     private let completionID = "chrono.active-completion"
 
-    override init() {
+    var delegate: UNUserNotificationCenterDelegate? {
+        get { center.delegate }
+        set { center.delegate = newValue }
+    }
+
+    init(center: UNUserNotificationCenter = .current()) {
+        self.center = center
+    }
+
+    func permissionStatus() async -> NotificationPermissionStatus {
+        switch await center.notificationSettings().authorizationStatus {
+        case .authorized, .provisional: .allowed
+        case .notDetermined: .notDetermined
+        default: .denied
+        }
+    }
+
+    func requestAuthorization() async throws -> Bool {
+        try await center.requestAuthorization(options: [.alert])
+    }
+
+    func add(_ request: CompletionNotificationRequest) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = request.title
+        content.body = request.body
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(request.interval, 1), repeats: false)
+        try await center.add(UNNotificationRequest(identifier: completionID, content: content, trigger: trigger))
+    }
+
+    func removeCompletionRequest() {
+        center.removePendingNotificationRequests(withIdentifiers: [completionID])
+    }
+}
+
+@MainActor
+protocol CompletionNotificationServing: AnyObject {
+    func scheduleCompletion(after interval: TimeInterval, title: String, body: String)
+    func cancelCompletion()
+    func playCompletionSound()
+}
+
+@MainActor
+final class NotificationService: NSObject, CompletionNotificationServing, UNUserNotificationCenterDelegate {
+    private let center: any UserNotificationCenterClient
+    private var schedulingTask: Task<Void, Never>?
+
+    init(center: any UserNotificationCenterClient = SystemUserNotificationCenterClient()) {
+        self.center = center
         super.init()
         center.delegate = self
     }
 
     func requestPermissionIfNeeded() async -> Bool {
-        let settings = await center.notificationSettings()
-        switch settings.authorizationStatus {
-        case .authorized, .provisional: return true
+        switch await center.permissionStatus() {
+        case .allowed: return true
         case .notDetermined:
-            return (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
-        default: return false
+            return (try? await center.requestAuthorization()) ?? false
+        case .denied: return false
         }
     }
 
-    func scheduleCompletion(after interval: TimeInterval, title: String, body: String, sound: Bool) async {
-        cancelCompletion()
-        guard interval > 0, await requestPermissionIfNeeded() else { return }
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        if sound { content.sound = .default }
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(interval, 1), repeats: false)
-        try? await center.add(UNNotificationRequest(identifier: completionID, content: content, trigger: trigger))
+    func scheduleCompletion(after interval: TimeInterval, title: String, body: String) {
+        let previousTask = schedulingTask
+        previousTask?.cancel()
+        center.removeCompletionRequest()
+        guard interval > 0 else { return }
+        let request = CompletionNotificationRequest(interval: interval, title: title, body: body)
+        schedulingTask = Task { [weak self] in
+            await previousTask?.value
+            guard let self, await requestPermissionIfNeeded(), !Task.isCancelled else { return }
+            do {
+                try await center.add(request)
+                if Task.isCancelled { center.removeCompletionRequest() }
+            } catch is CancellationError {
+                center.removeCompletionRequest()
+            } catch {
+                // A notification is supplemental; scheduling failure must not stop the timer.
+            }
+        }
     }
 
-    func cancelCompletion() { center.removePendingNotificationRequests(withIdentifiers: [completionID]) }
+    func cancelCompletion() {
+        schedulingTask?.cancel()
+        schedulingTask = nil
+        center.removeCompletionRequest()
+    }
 
     func playCompletionSound() {
         if NSSound(named: "Glass")?.play() != true { NSSound.beep() }
@@ -97,7 +200,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound])
+        completionHandler([.banner])
     }
 }
 
@@ -234,7 +337,7 @@ final class GlobalHotKeyService {
     private var hotKeys: [Action: EventHotKeyRef] = [:]
     private var actions: [Action: () -> Void] = [:]
 
-    deinit {
+    isolated deinit {
         for reference in hotKeys.values { UnregisterEventHotKey(reference) }
         if let eventHandler { RemoveEventHandler(eventHandler) }
     }

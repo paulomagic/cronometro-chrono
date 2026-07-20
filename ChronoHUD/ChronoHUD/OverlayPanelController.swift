@@ -6,8 +6,14 @@ final class OverlayPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 @MainActor
 final class OverlayPanelController: NSObject, NSWindowDelegate {
+    static let essentialSize = NSSize(width: 352, height: 92)
+
     private let appModel: AppModel
     private let panel: OverlayPanel
     private let defaults: UserDefaults
@@ -26,7 +32,7 @@ final class OverlayPanelController: NSObject, NSWindowDelegate {
         configurePanel()
     }
 
-    deinit {
+    isolated deinit {
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
     }
 
@@ -41,7 +47,7 @@ final class OverlayPanelController: NSObject, NSWindowDelegate {
         panel.isFloatingPanel = true
         panel.isMovableByWindowBackground = true
         panel.animationBehavior = .utilityWindow
-        panel.contentView = NSHostingView(rootView: OverlayView().environmentObject(appModel))
+        panel.contentView = FirstMouseHostingView(rootView: OverlayView().environmentObject(appModel))
         restorePosition()
         applyPreferences()
         screenObserver = NotificationCenter.default.addObserver(
@@ -74,12 +80,13 @@ final class OverlayPanelController: NSObject, NSWindowDelegate {
         panel.level = pinned ? .floating : .normal
     }
 
-    func applyPreferences() {
-        let compact = appModel.settings.preferences.compactMode
+    func applyPreferences(_ preferences: UserPreferences? = nil) {
+        let preferences = preferences ?? appModel.settings.preferences
+        let compact = preferences.compactMode
         let fullHeight: CGFloat = appModel.eventLogExpanded ? 620 : 445
-        let size = compact ? NSSize(width: 280, height: 86) : NSSize(width: 420, height: fullHeight)
-        panel.setContentSize(size)
-        panel.alphaValue = appModel.settings.preferences.opacity
+        let size = compact ? Self.essentialSize : NSSize(width: 420, height: fullHeight)
+        resizePanel(to: size)
+        panel.alphaValue = preferences.opacity
         keepOnScreen()
     }
 
@@ -103,6 +110,18 @@ final class OverlayPanelController: NSObject, NSWindowDelegate {
             panel.setFrameOrigin(NSPoint(x: visible.maxX - panel.frame.width - 32, y: visible.maxY - panel.frame.height - 32))
         }
         keepOnScreen()
+    }
+
+    private func resizePanel(to contentSize: NSSize) {
+        let currentFrame = panel.frame
+        let frameSize = panel.frameRect(forContentRect: NSRect(origin: .zero, size: contentSize)).size
+        let resizedFrame = NSRect(
+            x: currentFrame.minX,
+            y: currentFrame.maxY - frameSize.height,
+            width: frameSize.width,
+            height: frameSize.height
+        )
+        panel.setFrame(resizedFrame, display: true, animate: false)
     }
 
     private func keepOnScreen() {

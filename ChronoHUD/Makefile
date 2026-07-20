@@ -49,7 +49,8 @@ APP_PATH := $(BUILD_PRODUCTS)/$(APP_SCHEME).app
 
 PHONY_TARGETS := $(TARGET_PREFIX)help $(TARGET_PREFIX)diagnose $(TARGET_PREFIX)build \
 	$(TARGET_PREFIX)test $(TARGET_PREFIX)run $(TARGET_PREFIX)build-and-run \
-	$(TARGET_PREFIX)build-and-run-background $(TARGET_PREFIX)clean $(TARGET_PREFIX)agent-verify
+	$(TARGET_PREFIX)build-and-run-background $(TARGET_PREFIX)clean $(TARGET_PREFIX)lint \
+	$(TARGET_PREFIX)agent-verify
 .PHONY: $(PHONY_TARGETS)
 
 $(TARGET_PREFIX)help:
@@ -62,6 +63,7 @@ $(TARGET_PREFIX)help:
 		"  make $(TARGET_PREFIX)build-and-run            Build then run" \
 		"  make $(TARGET_PREFIX)build-and-run-background Build then run in background" \
 		"  make $(TARGET_PREFIX)clean                    Clean derived data + logs" \
+		"  make $(TARGET_PREFIX)lint                     Run SwiftLint when installed" \
 		"  make $(TARGET_PREFIX)agent-verify             Build and test"
 
 $(TARGET_PREFIX)diagnose:
@@ -164,6 +166,14 @@ endif
 $(TARGET_PREFIX)clean:
 	@$(SCRIPTS_DIR)/clean.sh
 
+$(TARGET_PREFIX)lint:
+	@if command -v swiftlint >/dev/null 2>&1; then \
+		swiftlint lint --config .swiftlint.yml --strict; \
+	else \
+		printf '%s\n' "SwiftLint is not installed; skipping optional lint check."; \
+	fi
+
 $(TARGET_PREFIX)agent-verify:
 	@$(MAKE) --no-print-directory $(TARGET_PREFIX)build
 	@$(MAKE) --no-print-directory $(TARGET_PREFIX)test
+	@$(MAKE) --no-print-directory $(TARGET_PREFIX)lint

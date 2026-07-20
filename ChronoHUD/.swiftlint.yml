@@ -1,0 +1,19 @@
+# Conservative initial policy for the existing codebase. This intentionally uses
+# a small allowlist until the team can review and baseline the default rule set.
+only_rules:
+  - force_cast
+  - force_try
+  - trailing_whitespace
+
+included:
+  - ChronoHUD
+  - ChronoHUDTests
+
+excluded:
+  - build
+  - DerivedData
+  - "**/.build"
+  - "**/Generated"
+
+reporter: xcode
+allow_zero_lintable_files: false

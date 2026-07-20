@@ -134,7 +134,7 @@ final class SessionRecord {
     var activeDuration: TimeInterval
     var result: String
     var pomodoroCycles: Int
-    @Relationship(deleteRule: .cascade) var laps: [LapRecord]
+    @Relationship(deleteRule: .cascade, inverse: \LapRecord.session) var laps: [LapRecord]
 
     init(draft: SessionDraft) {
         id = draft.id
@@ -157,12 +157,14 @@ final class LapRecord {
     var order: Int
     var elapsed: TimeInterval
     var timestamp: Date
+    var session: SessionRecord?
 
     init(snapshot: LapSnapshot) {
         id = snapshot.id
         order = snapshot.order
         elapsed = snapshot.elapsed
         timestamp = snapshot.timestamp
+        session = nil
     }
 }
 

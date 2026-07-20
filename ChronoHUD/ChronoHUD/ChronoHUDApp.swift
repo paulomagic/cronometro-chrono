@@ -10,18 +10,11 @@ struct ChronoHUDApp: App {
     private let container: ModelContainer
 
     init() {
-        let schema = Schema([SessionRecord.self, LapRecord.self])
-        let configuration = ModelConfiguration("ChronoHUD", schema: schema)
-        let container: ModelContainer
-        do {
-            container = try ModelContainer(for: schema, configurations: configuration)
-        } catch {
-            fatalError("Unable to create the local data store: \(error)")
-        }
+        let (container, startupError) = Self.makeContainer()
         self.container = container
-        let model = AppModel(container: container)
+        let model = AppModel(container: container, startupError: startupError)
         _appModel = StateObject(wrappedValue: model)
-        DispatchQueue.main.async { model.start() }
+        Task { @MainActor in model.start() }
     }
 
     var body: some Scene {
@@ -50,8 +43,35 @@ struct ChronoHUDApp: App {
                 .frame(width: 560, height: 500)
         }
     }
+
+    private static func makeContainer() -> (ModelContainer, String?) {
+        let schema = Schema([SessionRecord.self, LapRecord.self])
+        let configuration = ModelConfiguration("ChronoHUD", schema: schema)
+        do {
+            return (try ModelContainer(for: schema, configurations: configuration), nil)
+        } catch {
+            let persistentError = error
+            do {
+                let fallback = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                let container = try ModelContainer(for: schema, configurations: fallback)
+                let message = String(
+                    format: String(localized: "storage.fallback.message"),
+                    persistentError.localizedDescription
+                )
+                return (container, message)
+            } catch {
+                let alert = NSAlert()
+                alert.alertStyle = .critical
+                alert.messageText = String(localized: "storage.unavailable.title")
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+                Foundation.exit(EXIT_FAILURE)
+            }
+        }
+    }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     weak static var model: AppModel?
 
@@ -80,18 +100,30 @@ final class AppModel: ObservableObject {
     @Published var eventLogExpanded = true
 
     private let snapshotStore = SnapshotStore()
-    private let notificationService = NotificationService()
+    private let notificationService: any CompletionNotificationServing
     private let hotKeys = GlobalHotKeyService()
     private var cancellables: Set<AnyCancellable> = []
+    private var completionPulseTask: Task<Void, Never>?
     private var hasStarted = false
+    private let startupError: String?
     private var onboardingController: OnboardingWindowController?
 
     lazy var overlayController = OverlayPanelController(appModel: self)
 
-    init(container: ModelContainer) {
-        settings = SettingsStore()
-        engine = TimerEngine(preferences: settings.preferences)
-        repository = SessionRepository(container: container)
+    init(
+        container: ModelContainer,
+        settings: SettingsStore? = nil,
+        engine: TimerEngine? = nil,
+        repository: SessionRepository? = nil,
+        notificationService: (any CompletionNotificationServing)? = nil,
+        startupError: String? = nil
+    ) {
+        let resolvedSettings = settings ?? SettingsStore()
+        self.settings = resolvedSettings
+        self.engine = engine ?? TimerEngine(preferences: resolvedSettings.preferences)
+        self.repository = repository ?? SessionRepository(container: container)
+        self.notificationService = notificationService ?? NotificationService()
+        self.startupError = startupError
         wireServices()
     }
 
@@ -106,6 +138,7 @@ final class AppModel: ObservableObject {
         observeSystemEvents()
         if !UserDefaults.standard.bool(forKey: "chrono.onboarding.completed") { showOnboarding() }
         scheduleCompletionIfNeeded()
+        if let startupError { showError(startupError) }
     }
 
     func toggleTimer() {
@@ -193,21 +226,39 @@ final class AppModel: ObservableObject {
 
     private func wireServices() {
         engine.onSnapshotChanged = { [weak self] in self?.snapshotStore.save($0) }
-        engine.onSessionFinalized = { [weak self] in self?.repository.insert($0) }
+        engine.onSessionFinalized = { [weak self] draft in
+            guard let self else { return }
+            do { try repository.insert(draft) }
+            catch { showError(error.localizedDescription) }
+        }
         engine.onIntervalCompleted = { [weak self] _, _ in
             guard let self else { return }
             notificationService.cancelCompletion()
             if settings.preferences.soundEnabled { notificationService.playCompletionSound() }
             completionPulse = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.completionPulse = false }
+            completionPulseTask?.cancel()
+            completionPulseTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(1.5))
+                guard !Task.isCancelled else { return }
+                self?.completionPulse = false
+            }
+            scheduleCompletionIfNeeded()
         }
+        settings.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        engine.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
         settings.$preferences
             .dropFirst()
             .sink { [weak self] preferences in
                 guard let self else { return }
                 engine.applyPreferences(preferences)
-                overlayController.applyPreferences()
-                registerHotKeys()
+                guard hasStarted else { return }
+                overlayController.applyPreferences(preferences)
+                registerHotKeys(preferences)
+                scheduleCompletionIfNeeded(preferences)
             }
             .store(in: &cancellables)
     }
@@ -223,24 +274,22 @@ final class AppModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func registerHotKeys() {
-        let showStatus = hotKeys.register(.showHide, shortcut: settings.preferences.showHideShortcut) { [weak self] in self?.toggleHUD() }
-        let clickStatus = hotKeys.register(.clickThrough, shortcut: settings.preferences.clickThroughShortcut) { [weak self] in self?.toggleClickThrough() }
+    private func registerHotKeys(_ preferences: UserPreferences? = nil) {
+        let preferences = preferences ?? settings.preferences
+        let showStatus = hotKeys.register(.showHide, shortcut: preferences.showHideShortcut) { [weak self] in self?.toggleHUD() }
+        let clickStatus = hotKeys.register(.clickThrough, shortcut: preferences.clickThroughShortcut) { [weak self] in self?.toggleClickThrough() }
         shortcutError = (showStatus == noErr && clickStatus == noErr) ? nil : String(localized: "shortcut.conflict")
     }
 
-    private func scheduleCompletionIfNeeded() {
-        guard engine.state == .running, engine.mode != .stopwatch, settings.preferences.notificationsEnabled else { return }
+    private func scheduleCompletionIfNeeded(_ preferences: UserPreferences? = nil) {
+        let preferences = preferences ?? settings.preferences
+        guard engine.state == .running, engine.mode != .stopwatch, preferences.notificationsEnabled else {
+            notificationService.cancelCompletion()
+            return
+        }
         let title = engine.mode == .pomodoro ? String(localized: "notification.pomodoro.title") : String(localized: "notification.timer.title")
         let body = engine.mode == .pomodoro ? String(localized: "notification.pomodoro.body") : String(localized: "notification.timer.body")
-        Task {
-            await notificationService.scheduleCompletion(
-                after: engine.displayedInterval,
-                title: title,
-                body: body,
-                sound: settings.preferences.soundEnabled
-            )
-        }
+        notificationService.scheduleCompletion(after: engine.displayedInterval, title: title, body: body)
     }
 }
 

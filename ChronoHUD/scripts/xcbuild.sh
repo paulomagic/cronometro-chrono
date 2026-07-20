@@ -107,7 +107,9 @@ fi
 
 set +e
 {
-  SWIFT_OTHER_FLAGS="\$(inherited) -Xfrontend -module-cache-path -Xfrontend $SWIFT_MODULE_CACHE_PATH -Xfrontend -disable-sandbox"
+  # SWIFT_MODULE_CACHE_PATH already carries the exact path as an Xcode build setting.
+  # Repeating it inside OTHER_SWIFT_FLAGS makes paths with spaces split into source inputs.
+  SWIFT_OTHER_FLAGS="\$(inherited) -Xfrontend -disable-sandbox"
   xcodebuild \
     "$@" \
     -clonedSourcePackagesDirPath "$SWIFT_PACKAGE_CLONED_SOURCE_PACKAGES_DIR" \

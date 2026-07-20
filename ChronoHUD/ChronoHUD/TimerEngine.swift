@@ -2,17 +2,27 @@ import Combine
 import Foundation
 
 @MainActor
+final class TimerDisplay: ObservableObject {
+    @Published private(set) var interval: TimeInterval = 0
+
+    func update(_ interval: TimeInterval) {
+        self.interval = interval
+    }
+}
+
+@MainActor
 final class TimerEngine: ObservableObject {
     typealias DateProvider = () -> Date
 
     @Published private(set) var mode: TimerMode = .stopwatch
     @Published private(set) var state: RunState = .idle
-    @Published private(set) var displayedInterval: TimeInterval = 0
     @Published private(set) var pomodoroPhase: PomodoroPhase = .focus
     @Published private(set) var pomodoroCycle = 1
     @Published private(set) var laps: [LapSnapshot] = []
     @Published private(set) var events: [TimerEvent] = []
     @Published var sessionName = ""
+
+    let display = TimerDisplay()
 
     var onSnapshotChanged: ((ActiveSessionSnapshot?) -> Void)?
     var onSessionFinalized: ((SessionDraft) -> Void)?
@@ -34,10 +44,11 @@ final class TimerEngine: ObservableObject {
         updateDisplay(at: now())
     }
 
-    deinit { displayTimer?.invalidate() }
+    isolated deinit { displayTimer?.invalidate() }
 
     var isActive: Bool { state == .running || state == .paused }
     var canAddLap: Bool { mode == .stopwatch && state == .running }
+    var displayedInterval: TimeInterval { display.interval }
 
     var phaseDuration: TimeInterval {
         switch mode {
@@ -211,11 +222,11 @@ final class TimerEngine: ObservableObject {
     private func updateDisplay(at date: Date) {
         let elapsed = effectiveElapsed(at: date)
         if mode == .stopwatch {
-            displayedInterval = elapsed
+            display.update(elapsed)
             return
         }
         let remaining = max(phaseDuration - elapsed, 0)
-        displayedInterval = remaining
+        display.update(remaining)
         if state == .running && remaining <= 0 { completeInterval(at: date) }
     }
 
@@ -228,7 +239,23 @@ final class TimerEngine: ObservableObject {
             finalizeSession(at: date, result: "completed")
         }
         recordEvent(.completed, at: date)
+        if mode == .countdown && preferences.countdownRepeats {
+            beginRepeatedCountdown(at: date)
+            onIntervalCompleted?(mode, nil)
+            return
+        }
         onIntervalCompleted?(mode, mode == .pomodoro ? pomodoroPhase : nil)
+        persistSnapshot()
+    }
+
+    private func beginRepeatedCountdown(at date: Date) {
+        accumulated = 0
+        liveStartedAt = date
+        sessionStartedAt = date
+        state = .running
+        display.update(countdownDuration)
+        recordEvent(.started, at: date)
+        restartDisplayTimerIfNeeded()
         persistSnapshot()
     }
 
