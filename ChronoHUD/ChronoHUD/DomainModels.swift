@@ -110,6 +110,8 @@ struct ActiveSessionSnapshot: Codable, Equatable {
     var pomodoroCycle: Int
     var sessionName: String
     var laps: [LapSnapshot]
+    // RETROCOMPAT: must remain optional so snapshots written before Quick Timer decode as nil.
+    var countdownRepeatsOverride: Bool? = nil
 }
 
 struct SessionDraft {
@@ -174,6 +176,7 @@ struct ShortcutDefinition: Codable, Equatable {
 
     static let showHide = ShortcutDefinition(keyCode: 8, modifiers: 0x0100 | 0x0200) // C, cmd+shift
     static let clickThrough = ShortcutDefinition(keyCode: 17, modifiers: 0x0100 | 0x0200) // T, cmd+shift
+    static let quickTimer = ShortcutDefinition(keyCode: 49, modifiers: 0x0100 | 0x0200) // Space, cmd+shift
 }
 
 struct UserPreferences: Codable, Equatable {
@@ -193,6 +196,9 @@ struct UserPreferences: Codable, Equatable {
     var launchAtLogin = false
     var showHideShortcut = ShortcutDefinition.showHide
     var clickThroughShortcut = ShortcutDefinition.clickThrough
+    var quickTimerShortcut: ShortcutDefinition?
+
+    var effectiveQuickTimerShortcut: ShortcutDefinition { quickTimerShortcut ?? .quickTimer }
 }
 
 @MainActor
@@ -218,6 +224,15 @@ final class SettingsStore: ObservableObject {
         var copy = preferences
         change(&copy)
         preferences = copy
+    }
+
+    func encoded(_ candidate: UserPreferences) throws -> Data {
+        try JSONEncoder().encode(candidate)
+    }
+
+    func replace(with candidate: UserPreferences, encodedData: Data) {
+        preferences = candidate
+        defaults.set(encodedData, forKey: key)
     }
 
     private func save() {

@@ -1,6 +1,12 @@
 import Combine
 import Foundation
 
+enum TimerEngineError: Error, Equatable {
+    case activeSession
+    case noActiveSession
+    case invalidDuration
+}
+
 @MainActor
 final class TimerDisplay: ObservableObject {
     @Published private(set) var interval: TimeInterval = 0
@@ -36,6 +42,7 @@ final class TimerEngine: ObservableObject {
     private var countdownDuration: TimeInterval
     private var preferences: UserPreferences
     private var hudVisible = true
+    private(set) var countdownRepeatsOverride: Bool?
 
     init(preferences: UserPreferences = UserPreferences(), now: @escaping DateProvider = Date.init) {
         self.preferences = preferences
@@ -78,6 +85,22 @@ final class TimerEngine: ObservableObject {
         persistSnapshot()
     }
 
+    func startCountdown(duration: TimeInterval, repeats: Bool) throws {
+        try validateCountdownDuration(duration)
+        guard state == .idle || state == .completed else { throw TimerEngineError.activeSession }
+        beginStandaloneCountdown(duration: duration, repeats: repeats, at: now())
+    }
+
+    func replaceActiveSessionWithCountdown(duration: TimeInterval, repeats: Bool) throws {
+        try validateCountdownDuration(duration)
+        guard isActive else { throw TimerEngineError.noActiveSession }
+        let date = now()
+        if state == .running { accumulated = effectiveElapsed(at: date) }
+        liveStartedAt = nil
+        finalizeSession(at: date, result: "replaced")
+        beginStandaloneCountdown(duration: duration, repeats: repeats, at: date)
+    }
+
     @discardableResult
     func changeMode(to newMode: TimerMode, force: Bool = false) -> Bool {
         guard newMode != mode else { return true }
@@ -100,7 +123,10 @@ final class TimerEngine: ObservableObject {
             accumulated = 0
             laps = []
             sessionStartedAt = date
-            if mode == .countdown { countdownDuration = preferences.countdownDuration }
+            if mode == .countdown {
+                countdownDuration = preferences.countdownDuration
+                countdownRepeatsOverride = nil
+            }
         }
         guard state == .idle || state == .paused || state == .completed else { return }
         state = .running
@@ -156,6 +182,7 @@ final class TimerEngine: ObservableObject {
         pomodoroPhase = .focus
         pomodoroCycle = 1
         countdownDuration = preferences.countdownDuration
+        countdownRepeatsOverride = nil
         if clearName { sessionName = "" }
         let date = now()
         updateDisplay(at: date)
@@ -189,6 +216,7 @@ final class TimerEngine: ObservableObject {
         pomodoroCycle = max(snapshot.pomodoroCycle, 1)
         sessionName = snapshot.sessionName
         laps = snapshot.laps
+        countdownRepeatsOverride = snapshot.countdownRepeatsOverride
         updateDisplay(at: now())
         if state == .running { restartDisplayTimerIfNeeded() }
     }
@@ -210,7 +238,8 @@ final class TimerEngine: ObservableObject {
             pomodoroPhase: pomodoroPhase,
             pomodoroCycle: pomodoroCycle,
             sessionName: sessionName,
-            laps: laps
+            laps: laps,
+            countdownRepeatsOverride: countdownRepeatsOverride
         )
     }
 
@@ -239,7 +268,7 @@ final class TimerEngine: ObservableObject {
             finalizeSession(at: date, result: "completed")
         }
         recordEvent(.completed, at: date)
-        if mode == .countdown && preferences.countdownRepeats {
+        if mode == .countdown && (countdownRepeatsOverride ?? preferences.countdownRepeats) {
             beginRepeatedCountdown(at: date)
             onIntervalCompleted?(mode, nil)
             return
@@ -254,6 +283,26 @@ final class TimerEngine: ObservableObject {
         sessionStartedAt = date
         state = .running
         display.update(countdownDuration)
+        recordEvent(.started, at: date)
+        restartDisplayTimerIfNeeded()
+        persistSnapshot()
+    }
+
+    private func validateCountdownDuration(_ duration: TimeInterval) throws {
+        guard duration.isFinite, duration >= 1, duration <= 86_400 else { throw TimerEngineError.invalidDuration }
+    }
+
+    private func beginStandaloneCountdown(duration: TimeInterval, repeats: Bool, at date: Date) {
+        stopDisplayTimer()
+        mode = .countdown
+        state = .running
+        accumulated = 0
+        liveStartedAt = date
+        sessionStartedAt = date
+        countdownDuration = duration
+        countdownRepeatsOverride = repeats
+        laps = []
+        display.update(duration)
         recordEvent(.started, at: date)
         restartDisplayTimerIfNeeded()
         persistSnapshot()

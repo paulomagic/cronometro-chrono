@@ -68,3 +68,12 @@
    Done by: CODEX
    Done at: 2026-07-20T15:40:01Z
 
+7. quick-timer
+   Id: 7-quick-timer
+   Scope: Implementar somente o Timer rápido do MVP
+   Files: ChronoHUD/*.swift ChronoHUDTests/*.swift ChronoHUD/Resources/Localizable.xcstrings ChronoHUD.xcodeproj/project.pbxproj
+   Note: Starting work
+   Detail: tasks/details/7-quick-timer.md
+   Claimed by: CODEX
+   Claimed at: 2026-07-21T15:38:45Z
+

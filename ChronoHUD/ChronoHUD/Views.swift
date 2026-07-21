@@ -43,6 +43,8 @@ private struct OverlayContentView: View {
             }
         }
         .environment(\.colorScheme, isPremium ? .dark : .light)
+        .tint(accent)
+        .accentColor(accent)
         .background(background)
         .overlay(border)
         .clipShape(RoundedRectangle(cornerRadius: preferences.compactMode ? 14 : 18, style: .continuous))
@@ -90,11 +92,11 @@ private struct OverlayContentView: View {
                 .help(String(localized: "action.quit"))
             }
 
-            Picker("", selection: Binding(get: { engine.mode }, set: { appModel.requestModeChange($0) })) {
-                ForEach(TimerMode.allCases) { mode in Text(LocalizedStringKey(mode.titleKey)).tag(mode) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            ModeSelectorView(
+                mode: engine.mode,
+                accent: accent,
+                onSelect: { appModel.requestModeChange($0) }
+            )
 
             if engine.mode == .pomodoro {
                 HStack {
@@ -110,6 +112,7 @@ private struct OverlayContentView: View {
                 .textFieldStyle(.plain)
                 .font(.caption)
                 .multilineTextAlignment(.center)
+                .tint(accent)
 
             TimerReadoutView(
                 display: engine.display,
@@ -263,7 +266,7 @@ private struct OverlayContentView: View {
     private func eventColor(_ kind: TimerEventKind) -> Color {
         switch kind {
         case .started: .green
-        case .resumed: .cyan
+        case .resumed: accent
         case .paused, .stopped: .orange
         case .reset: .red
         case .completed: accent
@@ -431,6 +434,7 @@ struct MenuBarContentView: View {
     var body: some View {
         Button(appModel.hudVisible ? String(localized: "menu.hide") : String(localized: "menu.show")) { appModel.toggleHUD() }
         Divider()
+        Button("quickTimer.menu") { appModel.showQuickTimerFromMenu() }
         Button(appModel.engine.state.localizedActionTitle) { appModel.toggleTimer() }
         Button(String(localized: "action.reset")) { appModel.resetTimer() }
         Menu(String(localized: "menu.mode")) {
@@ -452,7 +456,7 @@ struct MenuBarContentView: View {
         Button(String(localized: "help.onboarding")) { appModel.showOnboarding() }
         if let error = appModel.shortcutError {
             Divider()
-            Text(error).foregroundStyle(.red)
+            Text(error).foregroundStyle(.secondary)
         }
         Divider()
         Button(String(localized: "action.quit")) { appModel.quit() }
@@ -540,7 +544,7 @@ struct SettingsView: View {
                 Toggle("settings.notifications", isOn: preference(\.notificationsEnabled))
                 Toggle("settings.sound", isOn: preference(\.soundEnabled))
                 Toggle("settings.milliseconds", isOn: preference(\.showMilliseconds))
-                if let error = appModel.shortcutError { Text(error).foregroundStyle(.red).font(.caption) }
+                if let error = appModel.shortcutError { Text(error).foregroundStyle(.secondary).font(.caption) }
             }
             .padding().tabItem { Label("settings.general", systemImage: "gear") }
 
@@ -569,12 +573,6 @@ struct SettingsView: View {
             }
             .padding().tabItem { Label("settings.appearance", systemImage: "paintpalette") }
 
-            Form {
-                shortcutRow("shortcut.showHide", action: .showHide, shortcut: appModel.settings.preferences.showHideShortcut)
-                shortcutRow("shortcut.clickThrough", action: .clickThrough, shortcut: appModel.settings.preferences.clickThroughShortcut)
-                Text("shortcut.modifiers.note").font(.caption).foregroundStyle(.secondary)
-            }
-            .padding().tabItem { Label("settings.shortcuts", systemImage: "command") }
         }
     }
 
@@ -591,19 +589,6 @@ struct SettingsView: View {
         }
     }
 
-    private func shortcutRow(_ title: LocalizedStringKey, action: GlobalHotKeyService.Action, shortcut: ShortcutDefinition) -> some View {
-        Picker(title, selection: Binding(
-            get: { shortcut.keyCode },
-            set: { keyCode in
-                appModel.updatePreferences {
-                    if action == .showHide { $0.showHideShortcut.keyCode = keyCode }
-                    else { $0.clickThroughShortcut.keyCode = keyCode }
-                }
-            }
-        )) {
-            ForEach(ShortcutKeyOption.all) { option in Text("⌘⇧\(option.label)").tag(option.keyCode) }
-        }
-    }
 }
 
 struct OnboardingView: View {
@@ -619,7 +604,7 @@ struct OnboardingView: View {
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
-            Image(systemName: pages[page].2).font(.system(size: 64)).foregroundStyle(.cyan)
+            Image(systemName: pages[page].2).font(.system(size: 64)).foregroundStyle(Color.chronoAccent(appModel.settings.preferences.accent))
             Text(LocalizedStringKey(pages[page].0)).font(.largeTitle.bold()).multilineTextAlignment(.center)
             Text(LocalizedStringKey(pages[page].1)).font(.title3).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 430)
             Spacer()
@@ -635,6 +620,47 @@ struct OnboardingView: View {
             }
         }
         .padding(32)
+    }
+}
+
+private struct ModeSelectorView: View {
+    let mode: TimerMode
+    let accent: Color
+    let onSelect: (TimerMode) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(TimerMode.allCases) { item in
+                let isSelected = mode == item
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        onSelect(item)
+                    }
+                } label: {
+                    Text(LocalizedStringKey(item.titleKey))
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(
+                            ZStack {
+                                if isSelected {
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .fill(accent)
+                                        .shadow(color: accent.opacity(0.30), radius: 4)
+                                }
+                            }
+                        )
+                        .foregroundStyle(isSelected ? Color.black : Color.primary.opacity(0.75))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(accent.opacity(0.18), lineWidth: 1)
+        )
     }
 }
 
@@ -701,17 +727,6 @@ private struct VisualEffectView: NSViewRepresentable {
     let blendingMode: NSVisualEffectView.BlendingMode
     func makeNSView(context: Context) -> NSVisualEffectView { let view = NSVisualEffectView(); view.material = material; view.blendingMode = blendingMode; view.state = .active; return view }
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
-}
-
-private struct ShortcutKeyOption: Identifiable {
-    let label: String
-    let keyCode: UInt32
-    var id: UInt32 { keyCode }
-    static let all = [
-        ShortcutKeyOption(label: "C", keyCode: 8), ShortcutKeyOption(label: "T", keyCode: 17),
-        ShortcutKeyOption(label: "H", keyCode: 4), ShortcutKeyOption(label: "P", keyCode: 35),
-        ShortcutKeyOption(label: "S", keyCode: 1), ShortcutKeyOption(label: "O", keyCode: 31)
-    ]
 }
 
 extension Color {

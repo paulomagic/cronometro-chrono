@@ -15,7 +15,13 @@
 		B10000000000000000000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* Assets.xcassets */; };
 		B10000000000000000000008 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* Localizable.xcstrings */; };
 		B10000000000000000000009 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000C /* PrivacyInfo.xcprivacy */; };
+		B1000000000000000000000D /* QuickTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000D /* QuickTimer.swift */; };
+		B1000000000000000000000E /* QuickTimerPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000E /* QuickTimerPanel.swift */; };
 		B20000000000000000000001 /* TimerEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* TimerEngineTests.swift */; };
+		B20000000000000000000003 /* QuickTimerParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* QuickTimerParserTests.swift */; };
+		B20000000000000000000004 /* QuickTimerPanelModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* QuickTimerPanelModelTests.swift */; };
+		B20000000000000000000005 /* GlobalHotKeyServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* GlobalHotKeyServiceTests.swift */; };
+		B20000000000000000000006 /* TimerEngineQuickTimerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* TimerEngineQuickTimerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,9 +46,15 @@
 		A10000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Resources/Info.plist; sourceTree = "<group>"; };
 		A1000000000000000000000A /* ChronoHUD.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Resources/ChronoHUD.entitlements; sourceTree = "<group>"; };
 		A1000000000000000000000C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A1000000000000000000000D /* QuickTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTimer.swift; sourceTree = "<group>"; };
+		A1000000000000000000000E /* QuickTimerPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTimerPanel.swift; sourceTree = "<group>"; };
 		A1000000000000000000000B /* ChronoHUD.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChronoHUD.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000001 /* TimerEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerEngineTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* ChronoHUDTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ChronoHUDTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000003 /* QuickTimerParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTimerParserTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* QuickTimerPanelModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTimerPanelModelTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* GlobalHotKeyServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKeyServiceTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* TimerEngineQuickTimerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerEngineQuickTimerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,6 +82,8 @@
 				A10000000000000000000004,
 				A10000000000000000000005,
 				A10000000000000000000006,
+				A1000000000000000000000D,
+				A1000000000000000000000E,
 				A10000000000000000000007,
 				A10000000000000000000008,
 				A10000000000000000000009,
@@ -79,7 +93,7 @@
 			path = ChronoHUD;
 			sourceTree = "<group>";
 		};
-		820000000000000000000001 /* ChronoHUDTests */ = {isa = PBXGroup; children = (A20000000000000000000001); path = ChronoHUDTests; sourceTree = "<group>"; };
+		820000000000000000000001 /* ChronoHUDTests */ = {isa = PBXGroup; children = (A20000000000000000000001, A20000000000000000000003, A20000000000000000000004, A20000000000000000000005, A20000000000000000000006); path = ChronoHUDTests; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -130,8 +144,8 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		610000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003, B10000000000000000000004, B10000000000000000000005, B10000000000000000000006); runOnlyForDeploymentPostprocessing = 0; };
-		620000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B20000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
+		610000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003, B10000000000000000000004, B10000000000000000000005, B10000000000000000000006, B1000000000000000000000D, B1000000000000000000000E); runOnlyForDeploymentPostprocessing = 0; };
+		620000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B20000000000000000000001, B20000000000000000000003, B20000000000000000000004, B20000000000000000000005, B20000000000000000000006); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */

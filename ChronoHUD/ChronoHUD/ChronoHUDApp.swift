@@ -95,13 +95,13 @@ final class AppModel: ObservableObject {
     @Published var isPinned = true
     @Published var isClickThrough = false
     @Published var hudVisible = true
-    @Published var shortcutError: String?
+    @Published private(set) var shortcutErrors: [GlobalHotKeyService.Action: ShortcutRegistrationError] = [:]
     @Published var completionPulse = false
     @Published var eventLogExpanded = true
 
     private let snapshotStore = SnapshotStore()
     private let notificationService: any CompletionNotificationServing
-    private let hotKeys = GlobalHotKeyService()
+    private let hotKeys: GlobalHotKeyService
     private var cancellables: Set<AnyCancellable> = []
     private var completionPulseTask: Task<Void, Never>?
     private var hasStarted = false
@@ -109,6 +109,11 @@ final class AppModel: ObservableObject {
     private var onboardingController: OnboardingWindowController?
 
     lazy var overlayController = OverlayPanelController(appModel: self)
+    lazy var quickTimerController = QuickTimerPanelController(appModel: self)
+
+    var shortcutError: String? {
+        shortcutErrors.isEmpty ? nil : String(localized: "shortcut.conflict")
+    }
 
     init(
         container: ModelContainer,
@@ -116,13 +121,15 @@ final class AppModel: ObservableObject {
         engine: TimerEngine? = nil,
         repository: SessionRepository? = nil,
         notificationService: (any CompletionNotificationServing)? = nil,
-        startupError: String? = nil
+        startupError: String? = nil,
+        hotKeyBackend: (any GlobalHotKeyBackend)? = nil
     ) {
         let resolvedSettings = settings ?? SettingsStore()
         self.settings = resolvedSettings
         self.engine = engine ?? TimerEngine(preferences: resolvedSettings.preferences)
         self.repository = repository ?? SessionRepository(container: container)
         self.notificationService = notificationService ?? NotificationService()
+        hotKeys = GlobalHotKeyService(backend: hotKeyBackend ?? SystemGlobalHotKeyBackend())
         self.startupError = startupError
         wireServices()
     }
@@ -192,6 +199,80 @@ final class AppModel: ObservableObject {
         settings.update(change)
     }
 
+    func effectiveShortcut(for action: GlobalHotKeyService.Action) -> ShortcutDefinition {
+        switch action {
+        case .showHide: settings.preferences.showHideShortcut
+        case .clickThrough: settings.preferences.clickThroughShortcut
+        case .quickTimer: settings.preferences.effectiveQuickTimerShortcut
+        }
+    }
+
+    func requestShortcutChange(action: GlobalHotKeyService.Action, keyCode: UInt32) {
+        let candidateShortcut = ShortcutDefinition(keyCode: keyCode, modifiers: ShortcutDefinition.quickTimer.modifiers)
+        guard candidateShortcut != effectiveShortcut(for: action) else { return }
+        if let duplicate = GlobalHotKeyService.Action.allCases.first(where: {
+            $0 != action && effectiveShortcut(for: $0) == candidateShortcut
+        }) {
+            shortcutErrors[action] = .duplicate(duplicate)
+            return
+        }
+
+        var candidate = settings.preferences
+        switch action {
+        case .showHide: candidate.showHideShortcut = candidateShortcut
+        case .clickThrough: candidate.clickThroughShortcut = candidateShortcut
+        case .quickTimer: candidate.quickTimerShortcut = candidateShortcut
+        }
+
+        do {
+            let encoded = try settings.encoded(candidate)
+            try hotKeys.replace(action, shortcut: candidateShortcut) {
+                settings.replace(with: candidate, encodedData: encoded)
+            }
+            shortcutErrors[action] = nil
+        } catch let error as ShortcutRegistrationError {
+            shortcutErrors[action] = error
+        } catch {
+            shortcutErrors[action] = .registration(OSStatus(paramErr))
+        }
+    }
+
+    func submitQuickTimer(
+        duration: TimeInterval,
+        policy: QuickTimerSubmissionPolicy
+    ) throws -> QuickTimerSubmissionResult {
+        switch policy {
+        case .requireIdle:
+            do { try engine.startCountdown(duration: duration, repeats: false) }
+            catch TimerEngineError.activeSession {
+                return .confirmationRequired(.sessionBecameActive)
+            }
+        case .replaceIfActive:
+            if engine.isActive {
+                try engine.replaceActiveSessionWithCountdown(duration: duration, repeats: false)
+            } else {
+                try engine.startCountdown(duration: duration, repeats: false)
+            }
+        }
+        notificationService.cancelCompletion()
+        scheduleCompletionIfNeeded()
+        overlayController.show()
+        return .started
+    }
+
+    func showQuickTimerFromMenu() {
+        guard let target = QuickTimerPlacementTarget.capture() else { return }
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            self?.quickTimerController.present(at: target)
+        }
+    }
+
+    func showQuickTimerFromHotKey() {
+        guard let target = QuickTimerPlacementTarget.capture() else { return }
+        quickTimerController.present(at: target)
+    }
+
     func setLaunchAtLogin(_ enabled: Bool) {
         do {
             try LoginItemService.setEnabled(enabled)
@@ -257,7 +338,6 @@ final class AppModel: ObservableObject {
                 engine.applyPreferences(preferences)
                 guard hasStarted else { return }
                 overlayController.applyPreferences(preferences)
-                registerHotKeys(preferences)
                 scheduleCompletionIfNeeded(preferences)
             }
             .store(in: &cancellables)
@@ -276,9 +356,30 @@ final class AppModel: ObservableObject {
 
     private func registerHotKeys(_ preferences: UserPreferences? = nil) {
         let preferences = preferences ?? settings.preferences
-        let showStatus = hotKeys.register(.showHide, shortcut: preferences.showHideShortcut) { [weak self] in self?.toggleHUD() }
-        let clickStatus = hotKeys.register(.clickThrough, shortcut: preferences.clickThroughShortcut) { [weak self] in self?.toggleClickThrough() }
-        shortcutError = (showStatus == noErr && clickStatus == noErr) ? nil : String(localized: "shortcut.conflict")
+        var startupErrors: [GlobalHotKeyService.Action: ShortcutRegistrationError] = [:]
+        let shortcuts: [GlobalHotKeyService.Action: ShortcutDefinition] = [
+            .showHide: preferences.showHideShortcut,
+            .clickThrough: preferences.clickThroughShortcut,
+            .quickTimer: preferences.effectiveQuickTimerShortcut
+        ]
+        for action in GlobalHotKeyService.Action.allCases {
+            guard let shortcut = shortcuts[action] else { continue }
+            if let duplicate = GlobalHotKeyService.Action.allCases.first(where: {
+                $0.rawValue < action.rawValue && shortcuts[$0] == shortcut
+            }) {
+                startupErrors[action] = .duplicate(duplicate)
+                continue
+            }
+            switch action {
+            case .showHide:
+                hotKeys.registerInitial(action, shortcut: shortcut) { [weak self] in self?.toggleHUD() }
+            case .clickThrough:
+                hotKeys.registerInitial(action, shortcut: shortcut) { [weak self] in self?.toggleClickThrough() }
+            case .quickTimer:
+                hotKeys.registerInitial(action, shortcut: shortcut) { [weak self] in self?.showQuickTimerFromHotKey() }
+            }
+        }
+        shortcutErrors = hotKeys.errors.merging(startupErrors) { _, startupError in startupError }
     }
 
     private func scheduleCompletionIfNeeded(_ preferences: UserPreferences? = nil) {

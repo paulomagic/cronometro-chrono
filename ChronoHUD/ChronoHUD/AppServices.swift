@@ -330,22 +330,58 @@ enum LoginItemService {
 }
 
 @MainActor
-final class GlobalHotKeyService {
-    enum Action: UInt32 { case showHide = 1, clickThrough = 2 }
+protocol GlobalHotKeyRegistration: AnyObject {
+    func cancel()
+}
 
-    private var eventHandler: EventHandlerRef?
-    private var hotKeys: [Action: EventHotKeyRef] = [:]
-    private var actions: [Action: () -> Void] = [:]
+@MainActor
+protocol GlobalHotKeyBackend: AnyObject {
+    func install(handler: @escaping (GlobalHotKeyService.Action) -> Void) throws
+    func register(
+        _ action: GlobalHotKeyService.Action,
+        shortcut: ShortcutDefinition
+    ) throws -> any GlobalHotKeyRegistration
+}
 
-    isolated deinit {
-        for reference in hotKeys.values { UnregisterEventHotKey(reference) }
-        if let eventHandler { RemoveEventHandler(eventHandler) }
+enum GlobalHotKeyBackendError: Error, Equatable {
+    case handlerInstallation(OSStatus)
+    case exclusiveConflict
+    case registration(OSStatus)
+}
+
+@MainActor
+private final class SystemGlobalHotKeyRegistration: GlobalHotKeyRegistration {
+    private var reference: EventHotKeyRef?
+    private let cancellation: (EventHotKeyRef) -> Void
+
+    init(reference: EventHotKeyRef, cancellation: @escaping (EventHotKeyRef) -> Void) {
+        self.reference = reference
+        self.cancellation = cancellation
     }
 
-    func install() {
+    func cancel() {
+        guard let reference else { return }
+        self.reference = nil
+        cancellation(reference)
+    }
+
+    isolated deinit {
+        if let reference { UnregisterEventHotKey(reference) }
+    }
+}
+
+@MainActor
+final class SystemGlobalHotKeyBackend: GlobalHotKeyBackend {
+    private var eventHandler: EventHandlerRef?
+    private var handler: ((GlobalHotKeyService.Action) -> Void)?
+    private var routes: [UInt32: GlobalHotKeyService.Action] = [:]
+    private var nextIdentifier: UInt32 = 1
+
+    func install(handler: @escaping (GlobalHotKeyService.Action) -> Void) throws {
+        self.handler = handler
         guard eventHandler == nil else { return }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(
+        let status = InstallEventHandler(
             GetApplicationEventTarget(),
             { _, event, userData in
                 guard let event, let userData else { return OSStatus(eventNotHandledErr) }
@@ -359,9 +395,12 @@ final class GlobalHotKeyService {
                     nil,
                     &identifier
                 )
-                guard status == noErr, let action = Action(rawValue: identifier.id) else { return status }
-                let service = Unmanaged<GlobalHotKeyService>.fromOpaque(userData).takeUnretainedValue()
-                Task { @MainActor in service.actions[action]?() }
+                guard status == noErr else { return status }
+                let backend = Unmanaged<SystemGlobalHotKeyBackend>.fromOpaque(userData).takeUnretainedValue()
+                Task { @MainActor in
+                    guard let action = backend.routes[identifier.id] else { return }
+                    backend.handler?(action)
+                }
                 return noErr
             },
             1,
@@ -369,16 +408,127 @@ final class GlobalHotKeyService {
             Unmanaged.passUnretained(self).toOpaque(),
             &eventHandler
         )
+        guard status == noErr else { throw GlobalHotKeyBackendError.handlerInstallation(status) }
     }
 
-    func register(_ action: Action, shortcut: ShortcutDefinition, handler: @escaping () -> Void) -> OSStatus {
-        install()
-        if let existing = hotKeys[action] { UnregisterEventHotKey(existing); hotKeys[action] = nil }
-        actions[action] = handler
+    func register(
+        _ action: GlobalHotKeyService.Action,
+        shortcut: ShortcutDefinition
+    ) throws -> any GlobalHotKeyRegistration {
+        let identifierValue = nextIdentifier
+        nextIdentifier &+= 1
+        let identifier = EventHotKeyID(signature: OSType(0x4348524F), id: identifierValue) // CHRO
         var reference: EventHotKeyRef?
-        let identifier = EventHotKeyID(signature: OSType(0x4348524F), id: action.rawValue) // CHRO
-        let status = RegisterEventHotKey(shortcut.keyCode, shortcut.modifiers, identifier, GetApplicationEventTarget(), 0, &reference)
-        if status == noErr, let reference { hotKeys[action] = reference }
-        return status
+        let status = RegisterEventHotKey(
+            shortcut.keyCode,
+            shortcut.modifiers,
+            identifier,
+            GetApplicationEventTarget(),
+            UInt32(kEventHotKeyExclusive),
+            &reference
+        )
+        // Carbon reports exclusive conflicts, but another process with a non-exclusive
+        // registration can still coexist. System/app conflicts also need manual validation.
+        guard status == noErr, let reference else {
+            if status == eventHotKeyExistsErr { throw GlobalHotKeyBackendError.exclusiveConflict }
+            throw GlobalHotKeyBackendError.registration(status)
+        }
+        routes[identifierValue] = action
+        return SystemGlobalHotKeyRegistration(reference: reference) { [weak self] reference in
+            UnregisterEventHotKey(reference)
+            self?.routes[identifierValue] = nil
+        }
+    }
+
+    isolated deinit {
+        if let eventHandler { RemoveEventHandler(eventHandler) }
+    }
+}
+
+enum ShortcutRegistrationError: Error, Equatable {
+    case duplicate(GlobalHotKeyService.Action)
+    case exclusiveConflict
+    case handlerInstallation(OSStatus)
+    case registration(OSStatus)
+}
+
+@MainActor
+final class GlobalHotKeyService {
+    enum Action: UInt32, CaseIterable, Hashable {
+        case showHide = 1
+        case clickThrough = 2
+        case quickTimer = 3
+    }
+
+    private let backend: any GlobalHotKeyBackend
+    private var registrations: [Action: any GlobalHotKeyRegistration] = [:]
+    private var handlers: [Action: () -> Void] = [:]
+    private(set) var errors: [Action: ShortcutRegistrationError] = [:]
+    private var installed = false
+
+    init(backend: any GlobalHotKeyBackend = SystemGlobalHotKeyBackend()) {
+        self.backend = backend
+    }
+
+    func registerInitial(_ action: Action, shortcut: ShortcutDefinition, handler: @escaping () -> Void) {
+        handlers[action] = handler
+        do {
+            try installIfNeeded()
+            let registration = try backend.register(action, shortcut: shortcut)
+            registrations[action]?.cancel()
+            registrations[action] = registration
+            errors[action] = nil
+        } catch let error as ShortcutRegistrationError {
+            errors[action] = error
+        } catch {
+            errors[action] = map(error)
+        }
+    }
+
+    func replace(
+        _ action: Action,
+        shortcut: ShortcutDefinition,
+        persist: () throws -> Void
+    ) throws {
+        do {
+            try installIfNeeded()
+            let candidate = try backend.register(action, shortcut: shortcut)
+            do { try persist() }
+            catch {
+                candidate.cancel()
+                throw error
+            }
+            let previous = registrations.updateValue(candidate, forKey: action)
+            previous?.cancel()
+            errors[action] = nil
+        } catch let error as ShortcutRegistrationError {
+            errors[action] = error
+            throw error
+        } catch {
+            let mapped = map(error)
+            errors[action] = mapped
+            throw mapped
+        }
+    }
+
+    var registrationCount: Int { registrations.count }
+
+    private func installIfNeeded() throws {
+        guard !installed else { return }
+        do {
+            try backend.install { [weak self] action in self?.handlers[action]?() }
+            installed = true
+        } catch {
+            throw map(error)
+        }
+    }
+
+    private func map(_ error: Error) -> ShortcutRegistrationError {
+        guard let backendError = error as? GlobalHotKeyBackendError else { return .registration(OSStatus(paramErr)) }
+        switch backendError {
+        case .handlerInstallation(let status): return .handlerInstallation(status)
+        case .exclusiveConflict: return .exclusiveConflict
+        case .registration(let status): return .registration(status)
+        }
     }
 }
