@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftData
 
@@ -204,20 +205,27 @@ struct UserPreferences: Codable, Equatable {
 @MainActor
 final class SettingsStore: ObservableObject {
     @Published var preferences: UserPreferences {
-        didSet { save() }
+        didSet {
+            save()
+            preferencesSubject.send(preferences)
+        }
     }
 
     private let defaults: UserDefaults
     private let key = "chrono.preferences.v1"
+    let preferencesSubject: CurrentValueSubject<UserPreferences, Never>
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        let initial: UserPreferences
         if let data = defaults.data(forKey: key),
            let decoded = try? JSONDecoder().decode(UserPreferences.self, from: data) {
-            preferences = decoded
+            initial = decoded
         } else {
-            preferences = UserPreferences()
+            initial = UserPreferences()
         }
+        self.preferences = initial
+        self.preferencesSubject = CurrentValueSubject(initial)
     }
 
     func update(_ change: (inout UserPreferences) -> Void) {

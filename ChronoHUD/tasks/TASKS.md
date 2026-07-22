@@ -72,8 +72,10 @@
    Id: 7-quick-timer
    Scope: Implementar somente o Timer rápido do MVP
    Files: ChronoHUD/*.swift ChronoHUDTests/*.swift ChronoHUD/Resources/Localizable.xcstrings ChronoHUD.xcodeproj/project.pbxproj
-   Note: Starting work
+   Note: Completed Quick Timer implementation, mode selector dynamic accent theme, button hit testing area fix, and synchronous opacity pipeline.
    Detail: tasks/details/7-quick-timer.md
    Claimed by: CODEX
    Claimed at: 2026-07-21T15:38:45Z
+   Done by: CODEX
+   Done at: 2026-07-21T21:07:00Z
 

@@ -165,6 +165,7 @@ private struct OverlayContentView: View {
                 Text("overlay.transparency")
                 Spacer()
                 Text("\(Int((preferences.opacity * 100).rounded()))%")
+                    .monospacedDigit()
                     .foregroundStyle(accent)
             }
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
@@ -174,13 +175,15 @@ private struct OverlayContentView: View {
 
             HStack(spacing: 6) {
                 ForEach([1.0, 0.8, 0.6, 0.4, 0.2], id: \.self) { value in
+                    let isSelected = abs(preferences.opacity - value) < 0.01
                     Button("\(Int(value * 100))%") {
                         appModel.updatePreferences { $0.opacity = value }
                     }
                     .buttonStyle(OpacityPresetButtonStyle(
                         color: accent,
-                        selected: abs(preferences.opacity - value) < 0.005
+                        selected: isSelected
                     ))
+                    .id("opacity-\(value)-\(isSelected)")
                 }
             }
         }
@@ -651,6 +654,7 @@ private struct ModeSelectorView: View {
                             }
                         )
                         .foregroundStyle(isSelected ? Color.black : Color.primary.opacity(0.75))
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -669,6 +673,7 @@ private struct ChronoPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.caption.bold()).padding(.horizontal, 16).padding(.vertical, 8)
             .background(color.opacity(configuration.isPressed ? 0.55 : 0.85), in: Capsule()).foregroundStyle(.black)
+            .contentShape(Capsule())
     }
 }
 
@@ -676,6 +681,7 @@ private struct ChronoSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.caption.bold()).padding(.horizontal, 12).padding(.vertical, 8)
             .background(.white.opacity(configuration.isPressed ? 0.04 : 0.09), in: Capsule())
+            .contentShape(Capsule())
     }
 }
 
@@ -709,6 +715,7 @@ private struct OpacityPresetButtonStyle: ButtonStyle {
             .background(selected ? color.opacity(0.12) : .clear)
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(selected ? color : color.opacity(0.22)))
             .opacity(configuration.isPressed ? 0.65 : 1)
+            .contentShape(Rectangle())
     }
 }
 

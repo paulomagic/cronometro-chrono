@@ -196,6 +196,7 @@ final class AppModel: ObservableObject {
     }
 
     func updatePreferences(_ change: (inout UserPreferences) -> Void) {
+        objectWillChange.send()
         settings.update(change)
     }
 
@@ -331,7 +332,7 @@ final class AppModel: ObservableObject {
         engine.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
-        settings.$preferences
+        settings.preferencesSubject
             .dropFirst()
             .sink { [weak self] preferences in
                 guard let self else { return }
