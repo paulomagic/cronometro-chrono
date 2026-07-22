@@ -4,9 +4,9 @@
 
 1. audit-native-implementation
    Id: 1-audit-native-implementation
-   Scope: Review the complete native CHRONO HUD implementation using the project-local Swift, SwiftUI, SwiftData, lint, Xcode, and documentation tooling.
+   Scope: Revisar a implementação nativa completa do CHRONO HUD utilizando ferramentas locais do projeto em Swift, SwiftUI, SwiftData, lint, Xcode e documentação.
    Files: ChronoHUD/,ChronoHUDTests/,Resources/,AppStore/,project.pbxproj,Makefile,scripts/
-   Note: Audit completed. Baseline Debug arm64 XCTest passed 7/7 in /tmp. Strict-concurrency build failed on AppDelegate.model. make agent-verify also exposed unescaped-space handling in xcbuild cache flags. No implementation files changed.
+   Note: Auditoria concluída. XCTest Debug arm64 baseline passou 7/7 em /tmp. Build de concorrência estrita falhou em AppDelegate.model. make agent-verify também expôs o tratamento de espaços não escapados em flags de cache do xcbuild. Nenhum arquivo de implementação foi alterado.
    Detail: tasks/details/1-audit-native-implementation.md
    Claimed by: CODEX
    Claimed at: 2026-07-19T01:00:49Z
@@ -15,9 +15,9 @@
 
 2. fix-audit-findings
    Id: 2-fix-audit-findings
-   Scope: Corrigir itens 1-9 da auditoria nativa; validar testes, concorrencia estrita e agent-verify; documentar pendencias externas App Store
+   Scope: Corrigir itens 1-9 da auditoria nativa; validar testes, concorrência estrita e agent-verify; documentar pendências externas App Store
    Files: ChronoHUD/DomainModels.swift,ChronoHUD/TimerEngine.swift,ChronoHUD/Views.swift,ChronoHUD/ChronoHUDApp.swift,ChronoHUD/AppServices.swift,ChronoHUDTests,Makefile,scripts/xcbuild.sh,.swiftlint.yml
-   Note: Finished audit items 1-9. Strict build passed; 13/13 XCTest passed via AGENT_NAME=CODEX make agent-verify; SwiftLint config/optional target added, tool not installed. App Store URLs/contact/screenshots/archive remain user-dependent.
+   Note: Concluídos os itens 1-9 da auditoria. Build estrito passou; 13/13 XCTest passaram via AGENT_NAME=CODEX make agent-verify; target opcional/config de SwiftLint adicionado, ferramenta não instalada. URLs da App Store/contato/capturas de tela/archive permanecem dependentes do usuário.
    Detail: tasks/details/2-fix-audit-findings.md
    Claimed by: CODEX
    Claimed at: 2026-07-19T01:15:30Z
@@ -39,7 +39,7 @@
    Id: 4-minimal-hud-layout
    Scope: Evoluir o HUD compacto para um layout essencial funcional e alternável pelo painel
    Files: ChronoHUD/Views.swift,ChronoHUD/OverlayPanelController.swift,ChronoHUD/DomainModels.swift,ChronoHUD/Resources/Localizable.xcstrings,ChronoHUDTests/TimerEngineTests.swift
-   Note: Implemented two-way Full/Essential HUD switching, dedicated 352x92 essential controls/status layout, persistent preference, localized accessibility/help, and top-left-preserving panel resize. Strict build passed; 15 XCTest cases passed outside sandbox. Manual UI validation stopped per user request; no git add/commit/push.
+   Note: Implementada alternância bidirecional Completo/Essencial do HUD, layout dedicado de 352x92 para controles/status essenciais, preferência persistente, acessibilidade/ajuda localizadas e redimensionamento de painel preservando o canto superior esquerdo. Build estrito passou; 15 casos de teste XCTest passaram fora do sandbox. Validação manual de UI pausada por solicitação do usuário; sem git add/commit/push.
    Detail: tasks/details/4-minimal-hud-layout.md
    Claimed by: CODEX
    Claimed at: 2026-07-19T02:08:12Z
@@ -59,9 +59,9 @@
 
 6. review-uncommitted
    Id: 6-review-uncommitted
-   Scope: Review all uncommitted changes, run relevant validation, commit and push if correct
+   Scope: Revisar todas as alterações não comitadas, executar validação relevante, comitar e enviar (push) se correto
    Files: ChronoHUD ChronoHUDTests Makefile scripts .swiftlint.yml agents tasks
-   Note: Reviewed all uncommitted changes; fixed notification replacement race and added regression coverage; strict warning-as-error build passed; 17/17 XCTest passed; SwiftLint optional tool unavailable; diff and string catalog validation passed
+   Note: Revisadas todas as alterações não comitadas; corrigida condição de corrida na substituição de notificações e adicionada cobertura de regressão; build estrito com warnings-como-erros passou; 17/17 XCTest passaram; ferramenta opcional SwiftLint indisponível; validação de diff e catálogo de strings passou.
    Detail: tasks/details/6-review-uncommitted.md
    Claimed by: CODEX
    Claimed at: 2026-07-20T15:32:37Z
@@ -72,10 +72,9 @@
    Id: 7-quick-timer
    Scope: Implementar somente o Timer rápido do MVP
    Files: ChronoHUD/*.swift ChronoHUDTests/*.swift ChronoHUD/Resources/Localizable.xcstrings ChronoHUD.xcodeproj/project.pbxproj
-   Note: Completed Quick Timer implementation, mode selector dynamic accent theme, button hit testing area fix, and synchronous opacity pipeline.
+   Note: Concluídos a implementação do Timer rápido, tema de destaque dinâmico no seletor de modo, correção de área de clique do botão e pipeline síncrono de opacidade.
    Detail: tasks/details/7-quick-timer.md
    Claimed by: CODEX
    Claimed at: 2026-07-21T15:38:45Z
    Done by: CODEX
    Done at: 2026-07-21T21:07:00Z
-

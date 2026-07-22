@@ -1,6 +1,6 @@
 # 6-review-uncommitted
 
-- Number: 6
+- Número: 6
 - Slug: review-uncommitted
 
-## Notes
+## Notas

@@ -1,6 +1,6 @@
 # 4-minimal-hud-layout
 
-- Number: 4
+- Número: 4
 - Slug: minimal-hud-layout
 
-## Notes
+## Notas

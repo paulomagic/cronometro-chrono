@@ -1,9 +1,9 @@
 # 7-quick-timer
 
-- Number: 7
+- Número: 7
 - Slug: quick-timer
 
-## Notes
+## Notas
 
 ## Estado em 2026-07-21
 

@@ -1,6 +1,6 @@
 # 2-fix-audit-findings
 
-- Number: 2
+- Número: 2
 - Slug: fix-audit-findings
 
-## Notes
+## Notas
