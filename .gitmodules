@@ -1,0 +1,3 @@
+[submodule "ChronoHUD/.agents/skills/ponytail"]
+	path = ChronoHUD/.agents/skills/ponytail
+	url = https://github.com/DietrichGebert/ponytail.git
